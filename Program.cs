@@ -13,36 +13,65 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 2. Configurar la base de datos SQLite
+// 2. Configurar SQLite
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=tienda.db"));
 
 var app = builder.Build();
 
-// OBLIGATORIO: Activar CORS antes de los endpoints
+// Activar CORS
 app.UseCors("PermitirTodo");
 
-// Asegurar la creación de la base de datos al arrancar
+// Inicializar base de datos y agregar datos de prueba si está vacía
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    if (!db.Productos.Any())
+    {
+        db.Productos.AddRange(
+            new Producto { Nombre = "Teclado Mecánico", Precio = 49.99m },
+            new Producto { Nombre = "Mouse Gamer", Precio = 25.50m },
+            new Producto { Nombre = "Monitor 24 pulgadas", Precio = 120.00m }
+        );
+        db.SaveChanges();
+    }
 }
 
 // ----------------------------------------------------
-// ENDPOINTS DE LA API
+// ENDPOINTS
 // ----------------------------------------------------
 
-// Endpoint de prueba / raíz
-app.MapGet("/", () => "API de Tienda activa y funcionando correctamente");
+// 1. Raíz de prueba
+app.MapGet("/", () => "API de Tienda activa");
 
-// Endpoint para consultar productos
+// 2. Obtener productos (GET)
 app.MapGet("/api/productos", async (AppDbContext db) =>
 {
     return await db.Productos.ToListAsync();
 });
 
-// Endpoint de Inicio de Sesión (Login)
+// 3. Crear producto (POST)
+app.MapPost("/api/productos", async (AppDbContext db, Producto producto) =>
+{
+    db.Productos.Add(producto);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/productos/{producto.Id}", producto);
+});
+
+// 4. Eliminar producto (DELETE)
+app.MapDelete("/api/productos/{id}", async (AppDbContext db, int id) =>
+{
+    var producto = await db.Productos.FindAsync(id);
+    if (producto is null) return Results.NotFound();
+
+    db.Productos.Remove(producto);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+});
+
+// 5. Endpoint de Login
 app.MapPost("/api/login", (UsuarioLogin login) =>
 {
     if (login != null && 
@@ -63,10 +92,23 @@ app.MapPost("/api/login", (UsuarioLogin login) =>
 app.Run();
 
 // ----------------------------------------------------
-// MODELO DE DATOS PARA LOGIN (DTO)
+// CLASES DE MODELO
 // ----------------------------------------------------
 public class UsuarioLogin
 {
     public string Usuario { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+}
+
+public class Producto
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public decimal Precio { get; set; }
+}
+
+public class AppDbContext : DbContext
+{
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    public DbSet<Producto> Productos => Set<Producto>();
 }
