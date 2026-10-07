@@ -80,3 +80,20 @@ app.MapDelete("/api/productos/{id}", async (AppDbContext db, int id) =>
 });
 
 app.Run();
+
+
+// POST: Endpoint de Login para autenticación
+app.MapPost("/api/login", (UsuarioLogin login) =>
+{
+    // Validación básica de credenciales (puedes ajustar el usuario/password que gustes)
+    if (login.Usuario == "admin" && login.Password == "1234")
+    {
+        // Retorna un token ficticio o la respuesta exitosa que espera tu frontend
+        return Results.Ok(new { token = "jwt-token-ficticio-de-prueba", mensaje = "Login exitoso" });
+    }
+
+    return Results.Unauthorized();
+});
+
+// Modelo de datos para recibir las credenciales
+record UsuarioLogin(string Usuario, string Password);
