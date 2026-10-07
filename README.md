@@ -3,8 +3,8 @@
 Aplicación web Full-Stack diseñada bajo una arquitectura desacoplada, con un frontend reactivo en **Vue 3** y un backend RESTful seguro en **ASP.NET Core**.
 
 ## 🔗 Links del Proyecto
-- 🌐 **Frontend en vivo (Netlify):** [Tu-Enlace-Netlify](https://tu-sitio.netlify.app)
-- ⚙️ **API REST en vivo (Render):** [Tu-Enlace-Render](https://mi-api-tienda-rspe.onrender.com)
+- 🌐 **Frontend en vivo (Netlify):** [https://app.netlify.com/projects/stirring-lollipop-25136b/overview).
+- ⚙️ **API REST en vivo (Render):** [https://mi-api-tienda-rspe.onrender.com).
 
 ## 🛠️ Tecnologías Utilizadas
 
