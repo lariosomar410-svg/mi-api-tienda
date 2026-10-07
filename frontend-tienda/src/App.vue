@@ -9,7 +9,8 @@ const cargando = ref(true)
 const productoEditando = ref(null)
 const token = ref(localStorage.getItem('jwt_token') || '')
 
-const URL_API = 'http://localhost:5240/api/productos'
+// URL de producción alojada en Render
+const URL_API = 'https://mi-api-tienda-rspe.onrender.com/api/productos'
 
 // Guardar Token al hacer Login
 const manejarLogin = (nuevoToken) => {
