@@ -22,7 +22,7 @@ var app = builder.Build();
 // Activar CORS
 app.UseCors("PermitirTodo");
 
-// Inicializar base de datos y agregar datos de prueba si está vacía
+// Inicializar base de datos
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -40,7 +40,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ----------------------------------------------------
-// ENDPOINTS
+// ENDPOINTS DE LA API
 // ----------------------------------------------------
 
 // 1. Raíz de prueba
@@ -91,24 +91,9 @@ app.MapPost("/api/login", (UsuarioLogin login) =>
 
 app.Run();
 
-// ----------------------------------------------------
-// CLASES DE MODELO
-// ----------------------------------------------------
+// DTO para el Login únicamente
 public class UsuarioLogin
 {
     public string Usuario { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
-}
-
-public class Producto
-{
-    public int Id { get; set; }
-    public string Nombre { get; set; } = string.Empty;
-    public decimal Precio { get; set; }
-}
-
-public class AppDbContext : DbContext
-{
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-    public DbSet<Producto> Productos => Set<Producto>();
 }
