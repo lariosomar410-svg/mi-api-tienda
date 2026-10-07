@@ -1,6 +1,15 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Clave secreta para firmar tokens JWT (mínimo 16 caracteres)
+var jwtSecretKey = "ClaveSecretaSuperSeguraParaTienda2026!";
+var keyBytes = Encoding.UTF8.GetBytes(jwtSecretKey);
 
 // 1. Configuración de CORS
 builder.Services.AddCors(options =>
@@ -13,16 +22,39 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 2. Configurar SQLite
+// 2. Configurar Autenticación y Autorización JWT
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+        ValidateIssuer = false,
+        ValidateAudience = false
+    };
+});
+
+builder.Services.AddAuthorization();
+
+// 3. Configurar SQLite
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=tienda.db"));
 
 var app = builder.Build();
 
-// Activar CORS
+// Middleware
 app.UseCors("PermitirTodo");
+app.UseAuthentication();
+app.UseAuthorization();
 
-// Inicializar base de datos
+// Inicializar DB
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -40,27 +72,39 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ----------------------------------------------------
-// ENDPOINTS DE LA API
+// ENDPOINTS
 // ----------------------------------------------------
 
-// 1. Raíz de prueba
 app.MapGet("/", () => "API de Tienda activa");
 
-// 2. Obtener productos (GET)
+// GET es público
 app.MapGet("/api/productos", async (AppDbContext db) =>
 {
     return await db.Productos.ToListAsync();
 });
 
-// 3. Crear producto (POST)
+// POST protegido con JWT
 app.MapPost("/api/productos", async (AppDbContext db, Producto producto) =>
 {
     db.Productos.Add(producto);
     await db.SaveChangesAsync();
     return Results.Created($"/api/productos/{producto.Id}", producto);
-});
+}).RequireAuthorization();
 
-// 4. Eliminar producto (DELETE)
+// PUT protegido con JWT
+app.MapPut("/api/productos/{id}", async (AppDbContext db, int id, Producto productoActualizado) =>
+{
+    var producto = await db.Productos.FindAsync(id);
+    if (producto is null) return Results.NotFound();
+
+    producto.Nombre = productoActualizado.Nombre;
+    producto.Precio = productoActualizado.Precio;
+
+    await db.SaveChangesAsync();
+    return Results.Ok(producto);
+}).RequireAuthorization();
+
+// DELETE protegido con JWT
 app.MapDelete("/api/productos/{id}", async (AppDbContext db, int id) =>
 {
     var producto = await db.Productos.FindAsync(id);
@@ -69,18 +113,28 @@ app.MapDelete("/api/productos/{id}", async (AppDbContext db, int id) =>
     db.Productos.Remove(producto);
     await db.SaveChangesAsync();
     return Results.NoContent();
-});
+}).RequireAuthorization();
 
-// 5. Endpoint de Login
+// Login con emisión de JWT Firmado Real
 app.MapPost("/api/login", (UsuarioLogin login) =>
 {
     if (login != null && 
         string.Equals(login.Usuario, "admin", StringComparison.OrdinalIgnoreCase) && 
         login.Password == "1234")
     {
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, login.Usuario) }),
+            Expires = DateTime.UtcNow.AddHours(2),
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256Signature)
+        };
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        var tokenString = tokenHandler.WriteToken(token);
+
         return Results.Ok(new 
         { 
-            token = "jwt-fake-token-12345", 
+            token = tokenString, 
             usuario = login.Usuario,
             mensaje = "Inicio de sesión exitoso" 
         });
@@ -91,7 +145,7 @@ app.MapPost("/api/login", (UsuarioLogin login) =>
 
 app.Run();
 
-// DTO para el Login únicamente
+// DTO de inicio de sesión
 public class UsuarioLogin
 {
     public string Usuario { get; set; } = string.Empty;
